@@ -112,6 +112,12 @@ void left_encoder_cw(void) {
         }
         return;
     }
+
+    if (display_mode == CAD_ONSHAPE || display_mode == CAD_FUSION) {
+        tap_code(MS_WHLD);
+        return;
+    }
+
     uint8_t current_layer = get_highest_layer(layer_state);
     switch (enc_mode) {
         case DEFAULT:
@@ -164,6 +170,12 @@ void left_encoder_ccw(void) {
         enc_mode = (enc_mode + 1) % ENCODER_MODES_COUNT;
         return;
     }
+
+    if (display_mode == CAD_ONSHAPE || display_mode == CAD_FUSION) {
+        tap_code(MS_WHLU);
+        return;
+    }
+
     uint8_t current_layer = get_highest_layer(layer_state);
     switch (enc_mode) {
         case DEFAULT:
