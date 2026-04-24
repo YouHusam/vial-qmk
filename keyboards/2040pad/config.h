@@ -1,0 +1,22 @@
+#pragma once
+#define HAL_USE_I2C TRUE
+#define I2C_DRIVER I2CD1
+#define I2C1_SDA_PIN GP10
+#define I2C1_SCL_PIN GP11
+
+#define OLED_DISPLAY_128X64
+#define OLED_DISPLAY_WIDTH 128
+#define OLED_DISPLAY_HEIGHT 64
+
+#define OLED_FONT_H "keyboards/2040pad/glcdfont.c"
+#define OLED_FONT_START 0
+#define OLED_FONT_END 223
+
+// Analog joystick pointing device
+// NOTE: X/Y axes MUST be wired to GP26 (ADC0) and GP27 (ADC1).
+#define ANALOG_JOYSTICK_Y_AXIS_PIN GP26
+#define ANALOG_JOYSTICK_X_AXIS_PIN GP27
+#define ANALOG_JOYSTICK_AUTO_AXIS
+#define ANALOG_JOYSTICK_SPEED_MAX 2
+#define ANALOG_JOYSTICK_SPEED_REGULATOR 20
+// #define ANALOG_JOYSTICK_CLICK_PIN GP9
