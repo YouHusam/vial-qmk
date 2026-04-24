@@ -4,6 +4,9 @@
 #define HOST_TELEMETRY_TIMEOUT_MS 2000
 #define CAD_ROTATE_RELEASE_MS 500
 
+/* Configurable base RAM size used to convert ram_percent to gigabytes. */
+#define RAM_SIZE_GB 32
+
 enum host_telemetry_value_ids {
     TELEMETRY_VALUE_HOST_STATUS = 0x01,
 };
@@ -23,9 +26,13 @@ typedef struct {
     uint8_t  volume_percent;
     uint8_t  cpu_percent;
     uint8_t  ram_percent;
-    uint16_t net_down_kbps;
-    uint16_t net_up_kbps;
-    uint32_t host_time_s;
+    /* Network speed split into two uint16_t fields to cover the full range
+     * without needing uint32_t. kbps is the fractional part (0-999),
+     * mbps is the integer Mbps part (0-65535, i.e. up to ~65 Gbps). */
+    uint16_t net_down_kbps;  /* 0-999 */
+    uint16_t net_down_mbps;
+    uint16_t net_up_kbps;    /* 0-999 */
+    uint16_t net_up_mbps;
     uint32_t last_update_ms;
 } host_telemetry_t;
 
@@ -48,8 +55,9 @@ bool host_telemetry_update_from_payload(const uint8_t *payload, uint8_t payload_
     host_telemetry.cpu_percent      = clamp_percent_u8(payload[4]);
     host_telemetry.ram_percent      = clamp_percent_u8(payload[5]);
     host_telemetry.net_down_kbps    = ((uint16_t)payload[7] << 8) | payload[6];
-    host_telemetry.net_up_kbps      = ((uint16_t)payload[9] << 8) | payload[8];
-    host_telemetry.host_time_s      = ((uint32_t)payload[10]) | ((uint32_t)payload[11] << 8) | ((uint32_t)payload[12] << 16) | ((uint32_t)payload[13] << 24);
+    host_telemetry.net_down_mbps    = ((uint16_t)payload[9] << 8) | payload[8];
+    host_telemetry.net_up_kbps      = ((uint16_t)payload[11] << 8) | payload[10];
+    host_telemetry.net_up_mbps      = ((uint16_t)payload[13] << 8) | payload[12];
     host_telemetry.last_update_ms   = timer_read32();
     host_telemetry_received         = true;
 
@@ -73,12 +81,12 @@ bool host_telemetry_write_payload(uint8_t *payload, uint8_t payload_len) {
     payload[5]  = host_telemetry.ram_percent;
     payload[6]  = (uint8_t)(host_telemetry.net_down_kbps & 0xFF);
     payload[7]  = (uint8_t)((host_telemetry.net_down_kbps >> 8) & 0xFF);
-    payload[8]  = (uint8_t)(host_telemetry.net_up_kbps & 0xFF);
-    payload[9]  = (uint8_t)((host_telemetry.net_up_kbps >> 8) & 0xFF);
-    payload[10] = (uint8_t)(host_telemetry.host_time_s & 0xFF);
-    payload[11] = (uint8_t)((host_telemetry.host_time_s >> 8) & 0xFF);
-    payload[12] = (uint8_t)((host_telemetry.host_time_s >> 16) & 0xFF);
-    payload[13] = (uint8_t)((host_telemetry.host_time_s >> 24) & 0xFF);
+    payload[8]  = (uint8_t)(host_telemetry.net_down_mbps & 0xFF);
+    payload[9]  = (uint8_t)((host_telemetry.net_down_mbps >> 8) & 0xFF);
+    payload[10] = (uint8_t)(host_telemetry.net_up_kbps & 0xFF);
+    payload[11] = (uint8_t)((host_telemetry.net_up_kbps >> 8) & 0xFF);
+    payload[12] = (uint8_t)(host_telemetry.net_up_mbps & 0xFF);
+    payload[13] = (uint8_t)((host_telemetry.net_up_mbps >> 8) & 0xFF);
 
     return true;
 }

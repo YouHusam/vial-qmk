@@ -47,31 +47,62 @@ void render_encoder_mode(void) {
     oled_write_P(PSTR(encoder_mode_names[enc_mode]), false);
 }
 
-void render_rect_bar_row(uint8_t row, uint8_t value, bool valid, const char *label) {
-    uint8_t cols   = oled_max_chars();
-    uint8_t llen   = (uint8_t)strlen(label);
-    uint8_t filled = 0;
+void render_rect_bar_row(uint8_t row, uint8_t value, bool valid, const char *label, const char *value_str) {
+    uint8_t cols     = oled_max_chars();
+    uint8_t filled   = 0;
+    uint8_t llen     = 0;
+    uint8_t vslen    = 0;
 
     if (valid) {
         if (value > 100) value = 100;
-        /* Full-width character bar; rounded for smoother transitions. */
         filled = (uint8_t)(((uint16_t)value * cols + 50) / 100);
     }
 
+    while (label[llen] != '\0') llen++;
+    if (value_str) {
+        while (value_str[vslen] != '\0') vslen++;
+    }
+
+    /* value_str is right-aligned; compute where it starts */
+    uint8_t vs_start = (vslen <= cols) ? (cols - vslen) : 0;
+
     oled_set_cursor(0, row);
-    for (uint8_t i = 0; i < cols; i++) {
-        bool inv = (i < filled);
-        oled_write_char(i < llen ? label[i] : ' ', inv);
+    for (uint8_t col = 0; col < cols; col++) {
+        char c;
+        if (col < llen) {
+            c = label[col];
+        } else if (value_str && col >= vs_start) {
+            c = value_str[col - vs_start];
+        } else {
+            c = ' ';
+        }
+        oled_write_char(c, col < filled);
     }
 }
 
-static void fmt_kbps(char *buf, uint8_t buflen, uint16_t kbps) {
-    if (kbps < 1000) {
+/* Format a network speed from its two split fields.
+ * mbps: integer Mbps part (0 = sub-Mbps speed)
+ * kbps: fractional kbps part (0-999) */
+static void fmt_net_speed(char *buf, uint8_t buflen, uint16_t mbps, uint16_t kbps) {
+    if (mbps == 0) {
+        /* sub-Mbps: e.g. " 50k" */
         snprintf(buf, buflen, "%3uk", (unsigned)kbps);
-    } else if (kbps < 10000) {
-        snprintf(buf, buflen, "%u.%uM", kbps / 1000, (kbps % 1000) / 100);
+    } else if (mbps < 100) {
+        /* 1-99 Mbps: show one decimal place if kbps part significant, e.g. "9.5M" */
+        if (kbps >= 100) {
+            snprintf(buf, buflen, "%u.%uM", (unsigned)mbps, (unsigned)(kbps / 100));
+        } else {
+            snprintf(buf, buflen, "%3uM", (unsigned)mbps);
+        }
+    } else if (mbps < 1000) {
+        /* 100-999 Mbps: no decimal (would overflow buffer), e.g. "600M" */
+        snprintf(buf, buflen, "%3uM", (unsigned)mbps);
+    } else if (mbps < 10000) {
+        /* Gbps range with decimal: e.g. "1.2G" */
+        snprintf(buf, buflen, "%u.%uG", (unsigned)(mbps / 1000), (unsigned)((mbps % 1000) / 100));
     } else {
-        snprintf(buf, buflen, "%3uM", kbps / 1000);
+        /* High Gbps: e.g. " 10G" */
+        snprintf(buf, buflen, "%3uG", (unsigned)(mbps / 1000));
     }
 }
 
@@ -89,10 +120,10 @@ void render_net_row(uint8_t row) {
         char ul[6] = "---";
 
         if (host_telemetry.valid_mask & TELEMETRY_VALID_NET_DOWN) {
-            fmt_kbps(dl, sizeof(dl), host_telemetry.net_down_kbps);
+            fmt_net_speed(dl, sizeof(dl), host_telemetry.net_down_mbps, host_telemetry.net_down_kbps);
         }
         if (host_telemetry.valid_mask & TELEMETRY_VALID_NET_UP) {
-            fmt_kbps(ul, sizeof(ul), host_telemetry.net_up_kbps);
+            fmt_net_speed(ul, sizeof(ul), host_telemetry.net_up_mbps, host_telemetry.net_up_kbps);
         }
 
         line[0] = 'D';
@@ -129,24 +160,31 @@ void render_normal_mode(void) {
         return;
     }
 
-    uint8_t metrics[3] = {
-        host_telemetry.volume_percent,
-        host_telemetry.cpu_percent,
-        host_telemetry.ram_percent,
-    };
-    uint8_t masks[3] = {
-        TELEMETRY_VALID_VOLUME,
-        TELEMETRY_VALID_CPU,
-        TELEMETRY_VALID_RAM,
-    };
-    const char *labels[3] = {
-        "VOL",
-        "CPU",
-        "RAM",
-    };
+    /* VOL bar — show percent value */
+    {
+        bool valid = (host_telemetry.valid_mask & TELEMETRY_VALID_VOLUME) != 0;
+        char vs[5] = "---";
+        if (valid) snprintf(vs, sizeof(vs), "%u%%", host_telemetry.volume_percent);
+        render_rect_bar_row(4, host_telemetry.volume_percent, valid, "VOL", vs);
+    }
 
-    for (uint8_t row = 0; row < 3; row++) {
-        render_rect_bar_row(row + 4, metrics[row], (host_telemetry.valid_mask & masks[row]) != 0, labels[row]);
+    /* CPU bar — show percent value */
+    {
+        bool valid = (host_telemetry.valid_mask & TELEMETRY_VALID_CPU) != 0;
+        char vs[5] = "---";
+        if (valid) snprintf(vs, sizeof(vs), "%u%%", host_telemetry.cpu_percent);
+        render_rect_bar_row(5, host_telemetry.cpu_percent, valid, "CPU", vs);
+    }
+
+    /* RAM bar — show GB used (base size configured by RAM_SIZE_GB in helpers.c) */
+    {
+        bool valid = (host_telemetry.valid_mask & TELEMETRY_VALID_RAM) != 0;
+        char vs[7] = "---";
+        if (valid) {
+            uint16_t gb_x10 = (uint16_t)(((uint32_t)host_telemetry.ram_percent * RAM_SIZE_GB * 10 + 50) / 100);
+            snprintf(vs, sizeof(vs), "%u.%uG", gb_x10 / 10, gb_x10 % 10);
+        }
+        render_rect_bar_row(6, host_telemetry.ram_percent, valid, "RAM", vs);
     }
 
     render_net_row(7);
