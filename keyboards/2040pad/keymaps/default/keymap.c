@@ -20,22 +20,52 @@
 #    include "via.h"
 #endif
 
+#include "dynamic_keymap.h"
+#include "cad_mode.h"
+
 #define TELEMETRY_CMD_VENDOR_SET 0xFC
 
 #include <helpers/helpers.c>
 #include <helpers/encoders.c>
+#include "../../cad_mode.c"
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
-    [0] = LAYOUT(KC_MEDIA_PREV_TRACK, KC_MEDIA_NEXT_TRACK, LT(1, LENC), LT(2, RENC), MS_BTN1, KC_KP_7, KC_KP_8, KC_KP_9, KC_KP_SLASH, KC_KP_4, KC_KP_5, KC_KP_6, KC_KP_ASTERISK, KC_KP_1, KC_KP_2, KC_KP_3, KC_KP_MINUS, KC_KP_0, KC_KP_DOT, KC_KP_PLUS, KC_KP_ENTER
-
-                 ),
-    [1] = LAYOUT(QK_BOOT, QK_RBT, LT(3, LENC), MODE_SELECT, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______
-
-                 ),
-    [2] = LAYOUT(_______, _______, MODE_SELECT, LT(3, RENC), _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, QK_CLEAR_EEPROM, _______, _______, _______
-
-                 ),
-    [3] = LAYOUT(MODE_SELECT, _______, LENC, RENC, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, QK_CLEAR_EEPROM, _______, _______, _______),
+    /* Layer 0: Main numeric pad with CAD mode support */
+    [0] = LAYOUT(
+        KC_MEDIA_PREV_TRACK,  KC_MEDIA_NEXT_TRACK,  LT(1, LENC),    LT(2, RENC),
+        MS_BTN1,
+        KC_KP_7,              KC_KP_8,              KC_KP_9,         KC_KP_SLASH,
+        KC_KP_4,              KC_KP_5,              KC_KP_6,         KC_KP_ASTERISK,
+        KC_KP_1,              KC_KP_2,              KC_KP_3,         KC_KP_MINUS,
+        KC_KP_0,              KC_KP_DOT,            KC_KP_PLUS,      KC_KP_ENTER
+    ),
+    /* Layer 1: Boot and encoder mode select */
+    [1] = LAYOUT(
+        QK_BOOT,              QK_RBT,               LT(3, LENC),     MODE_SELECT,
+        _______,
+        _______,              _______,              _______,         _______,
+        _______,              _______,              _______,         _______,
+        _______,              _______,              _______,         _______,
+        _______,              _______,              _______,         _______
+    ),
+    /* Layer 2: Mode select and encoder mode select */
+    [2] = LAYOUT(
+        _______,              _______,              MODE_SELECT,     LT(3, RENC),
+        _______,
+        _______,              _______,              _______,         _______,
+        _______,              _______,              _______,         _______,
+        _______,              _______,              _______,         _______,
+        _______,              QK_CLEAR_EEPROM,     _______,         _______
+    ),
+    /* Layer 3: Encoder navigation */
+    [3] = LAYOUT(
+        MODE_SELECT,          _______,              LENC,            RENC,
+        _______,
+        _______,              _______,              _______,         _______,
+        _______,              _______,              _______,         _______,
+        _______,              _______,              _______,         _______,
+        _______,              QK_CLEAR_EEPROM,     _______,         _______
+    ),
 };
 
 #ifdef ENCODER_MAP_ENABLE
@@ -51,36 +81,48 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
 #    include <helpers/display.c>
 #endif
 
-static void cad_toggle_pan(void) {
-    if (cad_btn_a_held) {
-        cad_release_all();
-        return;
+#ifdef VIAL_COMBO_ENABLE
+static void ensure_default_vial_combo(void) {
+    bool any_combo_defined = false;
+
+    for (uint8_t i = 0; i < VIAL_COMBO_ENTRIES; i++) {
+        vial_combo_entry_t entry = {0};
+        if (dynamic_keymap_get_combo(i, &entry) == 0) {
+            if (entry.output != KC_NO || entry.input[0] != KC_NO || entry.input[1] != KC_NO || entry.input[2] != KC_NO || entry.input[3] != KC_NO) {
+                any_combo_defined = true;
+                break;
+            }
+        }
     }
 
-    cad_release_all();
-    register_code(MS_BTN3);
-    cad_btn_a_held   = true;
-    cad_last_move_ms = timer_read32();
+    if (!any_combo_defined && VIAL_COMBO_ENTRIES > 0) {
+        vial_combo_entry_t entry = {
+            .input = {KC_MPRV, KC_MNXT, KC_NO, KC_NO},
+            .output = KC_MPLY,
+        };
+        dynamic_keymap_set_combo(0, &entry);
+    }
+}
+#endif
+
+void matrix_init_user(void) {
+#ifdef VIAL_COMBO_ENABLE
+    ensure_default_vial_combo();
+#endif
 }
 
-static void cad_toggle_rotate(void) {
-    if (cad_btn_b_held) {
-        cad_release_all();
-        return;
-    }
+#ifdef COMBO_SHOULD_TRIGGER
+bool combo_should_trigger(uint16_t combo_index, combo_t *combo, uint16_t keycode, keyrecord_t *record) {
+    (void)combo_index;
+    (void)combo;
+    (void)keycode;
+    (void)record;
 
-    cad_release_all();
-    if (display_mode == CAD_ONSHAPE) {
-        register_code(MS_BTN2);
-    } else {
-        register_mods(MOD_BIT(KC_LSFT));
-        send_keyboard_report();
-        wait_ms(10);
-        register_code(MS_BTN3);
-    }
-    cad_btn_b_held   = true;
-    cad_last_move_ms = timer_read32();
+    return display_mode == NORMAL;
 }
+#endif
+
+
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     bool is_cad_mode = display_mode == CAD_ONSHAPE || display_mode == CAD_FUSION;
@@ -89,14 +131,19 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         /* Handle physical A/B buttons by matrix location so Vial remaps stay compatible. */
         if (record->event.key.row == 0 && record->event.key.col == 0) {
             if (record->event.pressed) {
-                cad_toggle_pan();
+                /* Toggle pan mode on A button press */
+                is_pan_enabled = !is_pan_enabled;
+                /* Release any active action when toggling pan off */
+                if (!is_pan_enabled && cad_action != CAD_ACTION_NONE) {
+                    cad_release_all();
+                }
             }
             return false;
         }
 
         if (record->event.key.row == 0 && record->event.key.col == 1) {
             if (record->event.pressed) {
-                cad_toggle_rotate();
+                cad_btn_b_held = !cad_btn_b_held;
             }
             return false;
         }
@@ -134,7 +181,6 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     display_mode = display_mode_selector;
                     if (display_mode == CAD_ONSHAPE || display_mode == CAD_FUSION) {
                         cad_release_all();
-                        cad_last_move_ms = timer_read32();
                     }
                     return false;
                 }
@@ -192,16 +238,42 @@ bool encoder_update_user(uint8_t index, bool clockwise) {
 
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
     bool is_cad_mode = display_mode == CAD_ONSHAPE || display_mode == CAD_FUSION;
-    bool cad_active  = cad_btn_a_held || cad_btn_b_held;
+    report_mouse_t raw_report = mouse_report;
+    bool           has_motion;
 
-    if (!is_cad_mode || !cad_active) {
+    if (!is_cad_mode) {
         return mouse_report;
     }
 
-    if (mouse_report.x != 0 || mouse_report.y != 0) {
-        cad_last_move_ms = timer_read32();
-    } else if (timer_elapsed32(cad_last_move_ms) > CAD_IDLE_TIMEOUT_MS) {
-        cad_release_all();
+    has_motion = abs(raw_report.x) >= CAD_MOTION_THRESHOLD || abs(raw_report.y) >= CAD_MOTION_THRESHOLD;
+
+    /* Apply precision scaling when B button is held */
+    if (cad_btn_b_held) {
+        mouse_report.x = cad_scale_precision(mouse_report.x);
+        mouse_report.y = cad_scale_precision(mouse_report.y);
+    }
+
+    /* Pan mode: motion-gated like rotate (only press buttons when moving) */
+    if (is_pan_enabled) {
+        if (has_motion) {
+            cad_pan_last_motion_ms = timer_read32();
+            cad_press_pan();
+        } else if (cad_action == CAD_ACTION_PAN && timer_elapsed32(cad_pan_last_motion_ms) > CAD_ROTATE_RELEASE_MS) {
+            cad_release_pan();
+        }
+    } else if (!is_pan_enabled && cad_action == CAD_ACTION_PAN) {
+        /* Release pan if it was active but pan mode is now disabled */
+        cad_release_pan();
+    }
+
+    /* Rotate mode: motion-gated (only press buttons when moving) */
+    if (!is_pan_enabled) {
+        if (has_motion) {
+            cad_rotate_last_motion_ms = timer_read32();
+            cad_press_rotate();
+        } else if (cad_action == CAD_ACTION_ROTATE && timer_elapsed32(cad_rotate_last_motion_ms) > CAD_ROTATE_RELEASE_MS) {
+            cad_release_rotate();
+        }
     }
 
     return mouse_report;

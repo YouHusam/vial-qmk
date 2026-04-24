@@ -174,14 +174,15 @@ void render_cad_status_row(void) {
     char line[22];
     const char *app = display_mode == CAD_FUSION ? "FUSION" : "ONSHAPE";
     const char *action = "---";
+    const char *sens = cad_btn_b_held ? "LOW " : "NORM";
 
-    if (cad_btn_a_held) {
+    if (cad_action == CAD_ACTION_PAN) {
         action = "PAN";
-    } else if (cad_btn_b_held) {
-        action = "ROTATE";
+    } else if (cad_action == CAD_ACTION_ROTATE) {
+        action = "ROT";
     }
 
-    snprintf(line, sizeof(line), "CAD %-7s %-6s", app, action);
+    snprintf(line, sizeof(line), "CAD %-7s %-3s %s", app, action, sens);
     oled_set_cursor(0, 2);
     oled_write(line, false);
 }

@@ -3,6 +3,7 @@
 
 #define HOST_TELEMETRY_TIMEOUT_MS 2000
 #define CAD_IDLE_TIMEOUT_MS 2000
+#define CAD_ROTATE_RELEASE_MS 500
 
 enum host_telemetry_value_ids {
     TELEMETRY_VALUE_HOST_STATUS = 0x01,
@@ -134,17 +135,23 @@ const char* display_mode_names[] = {
 uint8_t display_mode = NORMAL;
 uint8_t display_mode_selector = NORMAL;
 
-bool     cad_btn_a_held   = false;
-bool     cad_btn_b_held   = false;
-uint32_t cad_last_move_ms = 0;
+bool     is_pan_enabled = false;
+bool     cad_btn_b_held = false;
+uint8_t  cad_action = CAD_ACTION_NONE;
+uint32_t cad_pan_last_motion_ms = 0;
+uint32_t cad_rotate_last_motion_ms = 0;
 
 void cad_release_all(void) {
-    unregister_code(MS_BTN3);
-    unregister_code(MS_BTN2);
+    mousekey_off(MS_BTN3);
+    mousekey_off(MS_BTN2);
+    mousekey_send();
     unregister_mods(MOD_BIT(KC_LSFT));
     del_weak_mods(MOD_BIT(KC_LSFT));
     send_keyboard_report();
 
-    cad_btn_a_held = false;
+    is_pan_enabled = false;
     cad_btn_b_held = false;
+    cad_action = CAD_ACTION_NONE;
+    cad_pan_last_motion_ms = 0;
+    cad_rotate_last_motion_ms = 0;
 }
