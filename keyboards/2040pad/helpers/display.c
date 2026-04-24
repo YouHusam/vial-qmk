@@ -23,27 +23,27 @@ void render_lock_status(void) {
 
 void render_layer(void) {
     oled_set_cursor(0, 1);
-    oled_write_P(PSTR("Layer:"), false);
+    oled_write_P(PSTR("L:"), false);
 
     switch (get_highest_layer(layer_state)) {
         case 0:
-            oled_write_P(PSTR(" Numpad  "), false);
+            oled_write_P(PSTR(" L0 "), false);
             break;
         case 1:
-            oled_write_P(PSTR(" Layer 1"), true);
+            oled_write_P(PSTR(" L1 "), true);
             break;
         case 2:
-            oled_write_P(PSTR(" Layer 2"), true);
+            oled_write_P(PSTR(" L2 "), true);
             break;
         case 3:
-            oled_write_P(PSTR(" Layer 3"), true);
+            oled_write_P(PSTR(" L3 "), true);
             break;
     }
 }
 
 void render_encoder_mode(void) {
-    oled_set_cursor(0, 2);
-    oled_write_P(PSTR("Enc Mode: "), false);
+    oled_set_cursor(9, 1);
+    oled_write_P(PSTR(" Enc:"), false);
     oled_write_P(PSTR(encoder_mode_names[enc_mode]), false);
 }
 

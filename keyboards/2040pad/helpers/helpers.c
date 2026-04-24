@@ -105,7 +105,7 @@ enum encoder_modes {
 
 const char* encoder_mode_names[] = {
     "DEFAULT",
-    "BRIGHTNESS",
+    "BRIGHT",
     "MOUSE",
     "TEXT",
     "APPSW",
