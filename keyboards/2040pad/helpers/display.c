@@ -170,6 +170,22 @@ void render_encoder_select_mode(void) {
     }
 }
 
+void render_cad_status_row(void) {
+    char line[22];
+    const char *app = display_mode == CAD_FUSION ? "FUSION" : "ONSHAPE";
+    const char *action = "---";
+
+    if (cad_btn_a_held) {
+        action = "PAN";
+    } else if (cad_btn_b_held) {
+        action = "ROTATE";
+    }
+
+    snprintf(line, sizeof(line), "CAD %-7s %-6s", app, action);
+    oled_set_cursor(0, 2);
+    oled_write(line, false);
+}
+
 bool oled_task_user(void) {
     static uint8_t previous_display_mode = NORMAL;
 
@@ -196,6 +212,11 @@ bool oled_task_user(void) {
             break;
         case CALCULATOR:
             render_calc();
+            break;
+        case CAD_ONSHAPE:
+        case CAD_FUSION:
+            render_normal_mode();
+            render_cad_status_row();
             break;
     }
 

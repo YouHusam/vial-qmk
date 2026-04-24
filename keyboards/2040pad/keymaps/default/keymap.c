@@ -26,50 +26,24 @@
 #include <helpers/encoders.c>
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
-    [0] = LAYOUT(
-        KC_MEDIA_PREV_TRACK,   KC_MEDIA_NEXT_TRACK, LT(1, LENC),   LT(2, RENC),
-        MS_BTN1,
-        KC_KP_7,   KC_KP_8,   KC_KP_9,   KC_KP_SLASH,
-        KC_KP_4,   KC_KP_5,   KC_KP_6,   KC_KP_ASTERISK,
-        KC_KP_1,   KC_KP_2,   KC_KP_3,   KC_KP_MINUS,
-        KC_KP_0,   KC_KP_DOT,  KC_KP_PLUS,   KC_KP_ENTER
+    [0] = LAYOUT(KC_MEDIA_PREV_TRACK, KC_MEDIA_NEXT_TRACK, LT(1, LENC), LT(2, RENC), MS_BTN1, KC_KP_7, KC_KP_8, KC_KP_9, KC_KP_SLASH, KC_KP_4, KC_KP_5, KC_KP_6, KC_KP_ASTERISK, KC_KP_1, KC_KP_2, KC_KP_3, KC_KP_MINUS, KC_KP_0, KC_KP_DOT, KC_KP_PLUS, KC_KP_ENTER
 
-    ),
-    [1] = LAYOUT(
-        QK_BOOT,   QK_RBT, LT(3, LENC),   MODE_SELECT,
-        _______,
-        _______,   _______,   _______,   _______,
-        _______,   _______,   _______,   _______,
-        _______,   _______,   _______,   _______,
-        _______,   _______,   _______,   _______
+                 ),
+    [1] = LAYOUT(QK_BOOT, QK_RBT, LT(3, LENC), MODE_SELECT, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______
 
-    ),
-    [2] = LAYOUT(
-        _______,   _______, MODE_SELECT,   LT(3, RENC),
-        _______,
-        _______,   _______,   _______,   _______,
-        _______,   _______,   _______,   _______,
-        _______,   _______,   _______,   _______,
-        QK_CLEAR_EEPROM,   _______,   _______,   _______
+                 ),
+    [2] = LAYOUT(_______, _______, MODE_SELECT, LT(3, RENC), _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, QK_CLEAR_EEPROM, _______, _______, _______
 
-    ),
-    [3] = LAYOUT(
-        MODE_SELECT,   _______, LENC,   RENC,
-        _______,
-        _______,   _______,   _______,   _______,
-        _______,   _______,   _______,   _______,
-        _______,   _______,   _______,   _______,
-        QK_CLEAR_EEPROM,   _______,   _______,   _______
-    ),
+                 ),
+    [3] = LAYOUT(MODE_SELECT, _______, LENC, RENC, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, QK_CLEAR_EEPROM, _______, _______, _______),
 };
-
 
 #ifdef ENCODER_MAP_ENABLE
 const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
-    [0] = { ENCODER_CCW_CW(MS_WHLD, MS_WHLU), ENCODER_CCW_CW(KC_VOLU, KC_VOLD) },
-    [1] = { ENCODER_CCW_CW(_______, _______), ENCODER_CCW_CW(_______, _______) },
-    [2] = { ENCODER_CCW_CW(_______, _______), ENCODER_CCW_CW(_______, _______) },
-    [3] = { ENCODER_CCW_CW(_______, _______), ENCODER_CCW_CW(_______, _______) },
+    [0] = {ENCODER_CCW_CW(MS_WHLD, MS_WHLU), ENCODER_CCW_CW(KC_VOLU, KC_VOLD)},
+    [1] = {ENCODER_CCW_CW(_______, _______), ENCODER_CCW_CW(_______, _______)},
+    [2] = {ENCODER_CCW_CW(_______, _______), ENCODER_CCW_CW(_______, _______)},
+    [3] = {ENCODER_CCW_CW(_______, _______), ENCODER_CCW_CW(_______, _______)},
 };
 #endif
 
@@ -78,6 +52,49 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
 #endif
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    bool is_cad_mode = display_mode == CAD_ONSHAPE || display_mode == CAD_FUSION;
+
+    if (is_cad_mode) {
+        /* Handle physical A/B buttons by matrix location so Vial remaps stay compatible. */
+        if (record->event.key.row == 0 && record->event.key.col == 0) {
+            if (record->event.pressed) {
+                register_code(MS_BTN3);
+                cad_btn_a_held = true;
+            } else {
+                cad_btn_a_held = false;
+                if (!(display_mode == CAD_FUSION && cad_btn_b_held)) {
+                    unregister_code(MS_BTN3);
+                }
+            }
+            return false;
+        }
+
+        if (record->event.key.row == 0 && record->event.key.col == 1) {
+            if (record->event.pressed) {
+                if (display_mode == CAD_ONSHAPE) {
+                    mousekey_on(MS_BTN2);
+                } else {
+                    // Use register_mods to ensure Shift is "active"
+                    register_mods(MOD_BIT(KC_LSFT));
+                    wait_ms(10);
+                    mousekey_on(MS_BTN3);
+                }
+                mousekey_send(); // Force the report to send immediately
+                cad_btn_b_held = true;
+            } else {
+                if (display_mode == CAD_ONSHAPE) {
+                    mousekey_off(MS_BTN2);
+                } else {
+                    mousekey_off(MS_BTN3);
+                    unregister_mods(MOD_BIT(KC_LSFT));
+                }
+                mousekey_send();
+                cad_btn_b_held = false;
+            }
+            return false;
+        }
+    }
+
     switch (keycode) {
         case LT(1, LENC):
         case LENC:
@@ -108,6 +125,9 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             if (record->event.pressed && record->tap.count) {
                 if (display_mode == ENCODER_SELECT) {
                     display_mode = display_mode_selector;
+                    if (display_mode == CAD_ONSHAPE || display_mode == CAD_FUSION) {
+                        cad_release_all();
+                    }
                     return false;
                 }
                 right_encoder_pressed(record->event.pressed);
@@ -119,6 +139,12 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             break;
         case MODE_SELECT:
             if (record->event.pressed) {
+                if (display_mode == CAD_ONSHAPE || display_mode == CAD_FUSION) {
+                    cad_release_all();
+                    display_mode_selector = display_mode;
+                    display_mode          = ENCODER_SELECT;
+                    return false;
+                }
                 display_mode_selector = display_mode;
                 display_mode          = ENCODER_SELECT;
             }

@@ -118,13 +118,31 @@ uint8_t enc_mode = DEFAULT;
 enum display_modes {
     NORMAL,
     CALCULATOR,
+    CAD_ONSHAPE,
+    CAD_FUSION,
     ENCODER_SELECT
 };
 
 const char* display_mode_names[] = {
     "NUMPAD",
-    "CALCULATOR"
+    "CALCULATOR",
+    "ONSHAPE",
+    "FUSION"
 };
 
 uint8_t display_mode = NORMAL;
 uint8_t display_mode_selector = NORMAL;
+
+bool     cad_btn_a_held   = false;
+bool     cad_btn_b_held   = false;
+
+void cad_release_all(void) {
+    unregister_code(MS_BTN3);
+    unregister_code(MS_BTN2);
+    unregister_mods(MOD_BIT(KC_LSFT));
+    del_weak_mods(MOD_BIT(KC_LSFT));
+    send_keyboard_report();
+
+    cad_btn_a_held = false;
+    cad_btn_b_held = false;
+}
