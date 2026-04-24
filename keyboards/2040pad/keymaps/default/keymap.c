@@ -51,6 +51,37 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
 #    include <helpers/display.c>
 #endif
 
+static void cad_toggle_pan(void) {
+    if (cad_btn_a_held) {
+        cad_release_all();
+        return;
+    }
+
+    cad_release_all();
+    register_code(MS_BTN3);
+    cad_btn_a_held   = true;
+    cad_last_move_ms = timer_read32();
+}
+
+static void cad_toggle_rotate(void) {
+    if (cad_btn_b_held) {
+        cad_release_all();
+        return;
+    }
+
+    cad_release_all();
+    if (display_mode == CAD_ONSHAPE) {
+        register_code(MS_BTN2);
+    } else {
+        register_mods(MOD_BIT(KC_LSFT));
+        send_keyboard_report();
+        wait_ms(10);
+        register_code(MS_BTN3);
+    }
+    cad_btn_b_held   = true;
+    cad_last_move_ms = timer_read32();
+}
+
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     bool is_cad_mode = display_mode == CAD_ONSHAPE || display_mode == CAD_FUSION;
 
@@ -58,38 +89,14 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         /* Handle physical A/B buttons by matrix location so Vial remaps stay compatible. */
         if (record->event.key.row == 0 && record->event.key.col == 0) {
             if (record->event.pressed) {
-                register_code(MS_BTN3);
-                cad_btn_a_held = true;
-            } else {
-                cad_btn_a_held = false;
-                if (!(display_mode == CAD_FUSION && cad_btn_b_held)) {
-                    unregister_code(MS_BTN3);
-                }
+                cad_toggle_pan();
             }
             return false;
         }
 
         if (record->event.key.row == 0 && record->event.key.col == 1) {
             if (record->event.pressed) {
-                if (display_mode == CAD_ONSHAPE) {
-                    mousekey_on(MS_BTN2);
-                } else {
-                    // Use register_mods to ensure Shift is "active"
-                    register_mods(MOD_BIT(KC_LSFT));
-                    wait_ms(10);
-                    mousekey_on(MS_BTN3);
-                }
-                mousekey_send(); // Force the report to send immediately
-                cad_btn_b_held = true;
-            } else {
-                if (display_mode == CAD_ONSHAPE) {
-                    mousekey_off(MS_BTN2);
-                } else {
-                    mousekey_off(MS_BTN3);
-                    unregister_mods(MOD_BIT(KC_LSFT));
-                }
-                mousekey_send();
-                cad_btn_b_held = false;
+                cad_toggle_rotate();
             }
             return false;
         }
@@ -127,6 +134,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     display_mode = display_mode_selector;
                     if (display_mode == CAD_ONSHAPE || display_mode == CAD_FUSION) {
                         cad_release_all();
+                        cad_last_move_ms = timer_read32();
                     }
                     return false;
                 }
@@ -181,6 +189,23 @@ bool encoder_update_user(uint8_t index, bool clockwise) {
     return false;
 }
 #endif
+
+report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
+    bool is_cad_mode = display_mode == CAD_ONSHAPE || display_mode == CAD_FUSION;
+    bool cad_active  = cad_btn_a_held || cad_btn_b_held;
+
+    if (!is_cad_mode || !cad_active) {
+        return mouse_report;
+    }
+
+    if (mouse_report.x != 0 || mouse_report.y != 0) {
+        cad_last_move_ms = timer_read32();
+    } else if (timer_elapsed32(cad_last_move_ms) > CAD_IDLE_TIMEOUT_MS) {
+        cad_release_all();
+    }
+
+    return mouse_report;
+}
 
 #ifdef VIA_ENABLE
 void raw_hid_receive_kb(uint8_t *data, uint8_t length) {

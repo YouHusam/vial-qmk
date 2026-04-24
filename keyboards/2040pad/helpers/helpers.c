@@ -2,6 +2,7 @@
 #include QMK_KEYBOARD_H
 
 #define HOST_TELEMETRY_TIMEOUT_MS 2000
+#define CAD_IDLE_TIMEOUT_MS 2000
 
 enum host_telemetry_value_ids {
     TELEMETRY_VALUE_HOST_STATUS = 0x01,
@@ -135,6 +136,7 @@ uint8_t display_mode_selector = NORMAL;
 
 bool     cad_btn_a_held   = false;
 bool     cad_btn_b_held   = false;
+uint32_t cad_last_move_ms = 0;
 
 void cad_release_all(void) {
     unregister_code(MS_BTN3);
