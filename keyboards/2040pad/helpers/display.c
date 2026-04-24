@@ -170,21 +170,29 @@ void render_encoder_select_mode(void) {
     }
 }
 
+static void oled_write_padded_token(const char *text, uint8_t width, bool invert) {
+    for (uint8_t i = 0; i < width; i++) {
+        char c = text[i] != '\0' ? text[i] : ' ';
+        oled_write_char(c, invert);
+    }
+}
+
 void render_cad_status_row(void) {
-    char line[22];
     const char *app = display_mode == CAD_FUSION ? "FUSION" : "ONSHAPE";
     const char *action = "---";
-    const char *sens = cad_btn_b_held ? "LOW " : "NORM";
+    const char *sens = cad_btn_b_held ? " LOW " : "NORM";
 
-    if (cad_action == CAD_ACTION_PAN) {
-        action = "PAN";
-    } else if (cad_action == CAD_ACTION_ROTATE) {
-        action = "ROT";
+    if (is_pan_enabled) {
+        action = " PAN ";
+    } else {
+        action = " ROT ";
     }
 
-    snprintf(line, sizeof(line), "CAD %-7s %-3s %s", app, action, sens);
     oled_set_cursor(0, 2);
-    oled_write(line, false);
+    oled_write_padded_token(app, 7, false);
+    oled_write("    ", false);
+    oled_write_padded_token(action, 5, is_pan_enabled);
+    oled_write_padded_token(sens, 5, cad_btn_b_held);
 }
 
 bool oled_task_user(void) {

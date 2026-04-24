@@ -2,7 +2,6 @@
 #include QMK_KEYBOARD_H
 
 #define HOST_TELEMETRY_TIMEOUT_MS 2000
-#define CAD_IDLE_TIMEOUT_MS 2000
 #define CAD_ROTATE_RELEASE_MS 500
 
 enum host_telemetry_value_ids {
@@ -135,23 +134,27 @@ const char* display_mode_names[] = {
 uint8_t display_mode = NORMAL;
 uint8_t display_mode_selector = NORMAL;
 
-bool     is_pan_enabled = false;
-bool     cad_btn_b_held = false;
-uint8_t  cad_action = CAD_ACTION_NONE;
-uint32_t cad_pan_last_motion_ms = 0;
+bool     is_pan_enabled           = false;
+bool     cad_btn_b_held           = false;
+uint8_t  cad_action               = CAD_ACTION_NONE;
+uint8_t  cad_held_buttons         = 0;    /* button bitmask applied inside the pointing device report each scan */
+bool     cad_shift_held           = false;
+uint32_t cad_pan_last_motion_ms    = 0;
 uint32_t cad_rotate_last_motion_ms = 0;
 
 void cad_release_all(void) {
-    mousekey_off(MS_BTN3);
-    mousekey_off(MS_BTN2);
-    mousekey_send();
-    unregister_mods(MOD_BIT(KC_LSFT));
-    del_weak_mods(MOD_BIT(KC_LSFT));
-    send_keyboard_report();
+    cad_held_buttons = 0;
 
-    is_pan_enabled = false;
-    cad_btn_b_held = false;
-    cad_action = CAD_ACTION_NONE;
-    cad_pan_last_motion_ms = 0;
-    cad_rotate_last_motion_ms = 0;
+    if (cad_shift_held) {
+        unregister_mods(MOD_BIT(KC_LSFT));
+        del_weak_mods(MOD_BIT(KC_LSFT));
+        send_keyboard_report();
+        cad_shift_held = false;
+    }
+
+    is_pan_enabled             = false;
+    cad_btn_b_held             = false;
+    cad_action                 = CAD_ACTION_NONE;
+    cad_pan_last_motion_ms     = 0;
+    cad_rotate_last_motion_ms  = 0;
 }

@@ -131,12 +131,9 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         /* Handle physical A/B buttons by matrix location so Vial remaps stay compatible. */
         if (record->event.key.row == 0 && record->event.key.col == 0) {
             if (record->event.pressed) {
-                /* Toggle pan mode on A button press */
-                is_pan_enabled = !is_pan_enabled;
-                /* Release any active action when toggling pan off */
-                if (!is_pan_enabled && cad_action != CAD_ACTION_NONE) {
-                    cad_release_all();
-                }
+                /* Toggle pan mode on A button press with synchronized release. */
+                cad_release_active_action();
+                cad_set_pan_enabled(!is_pan_enabled);
             }
             return false;
         }
@@ -259,11 +256,11 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             cad_pan_last_motion_ms = timer_read32();
             cad_press_pan();
         } else if (cad_action == CAD_ACTION_PAN && timer_elapsed32(cad_pan_last_motion_ms) > CAD_ROTATE_RELEASE_MS) {
-            cad_release_pan();
+            cad_release_active_action();
         }
     } else if (!is_pan_enabled && cad_action == CAD_ACTION_PAN) {
         /* Release pan if it was active but pan mode is now disabled */
-        cad_release_pan();
+        cad_release_active_action();
     }
 
     /* Rotate mode: motion-gated (only press buttons when moving) */
@@ -272,9 +269,15 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             cad_rotate_last_motion_ms = timer_read32();
             cad_press_rotate();
         } else if (cad_action == CAD_ACTION_ROTATE && timer_elapsed32(cad_rotate_last_motion_ms) > CAD_ROTATE_RELEASE_MS) {
-            cad_release_rotate();
+            cad_release_active_action();
         }
     }
+
+    /* Set the CAD button state for this report. Assignment (not |=) is required
+     * because QMK preserves mouse_report.buttons between scans, so |= would
+     * never clear a bit once set. Mousekey (MS_BTN1 etc.) is merged in by QMK
+     * after this function returns, so physical keys are unaffected. */
+    mouse_report.buttons = cad_held_buttons;
 
     return mouse_report;
 }
